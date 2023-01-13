@@ -85,8 +85,8 @@ function multiselect {
       ((idx++))
     done
     cursor_to $(($startrow + $idx))
-    if [ $selected_count -gt 3 ]; then
-      printf "\e[1;97;41m to many keys selected, please select up to 3 keys \e[0m"
+    if [ $selected_count -gt 5 ]; then
+      printf "\e[1;97;41m to many keys selected, please select up to 5 keys \e[0m"
     else 
       printf "                           "
     fi
