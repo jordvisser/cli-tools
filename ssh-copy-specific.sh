@@ -300,10 +300,19 @@ for i in "${!key_array[@]}"; do
   key_names+=("$key_name")
 done
 
+# Get the array of ssh key names
+ssh_key_names=()
+
+ssh_key_names_string=$(get_ssh_key_names)
+IFS=$'\n' read -rd '' -a ssh_key_names <<<"$ssh_key_names_string"
+
+key_names+=(${ssh_key_names[@]})
+
 # Set initial selection
 result=()
 pre_selection=()
-for key in "${key_array[@]}"; do
+# for key in "${key_array[@]}"; do
+for key in "${key_names[@]}"; do
   pre_selection+=("false")
 done
 
@@ -321,14 +330,8 @@ for key in "${key_array[@]}"; do
   ((idx++))
 done
 
-# Get the array of ssh key names
-ssh_key_names=()
-
-ssh_key_names_string=$(get_ssh_key_names)
-IFS=$'\n' read -rd '' -a ssh_key_names <<<"$ssh_key_names_string"
-
 # Print out a list of ssh key names
-printf "List of ssh key names:\n"
-for name in "${ssh_key_names[@]}"; do
-  printf " - %s\n" "$name"
-done
+# printf "List of ssh key names:\n"
+# for name in "${ssh_key_names[@]}"; do
+#   printf " - %s\n" "$name"
+# done
