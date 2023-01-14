@@ -1,6 +1,90 @@
 #!/usr/bin/env bash
 
 ###############################################################################
+# Converts a string to lowercase, replaces special characters and whitespace
+# characters with underscores.
+#
+# Args:
+#   input_string: The string to be converted.
+#
+# Returns:
+#   The modified string with only lowercase alphabetical characters, numbers,
+#   and underscores.
+###############################################################################
+convert_string() {
+  # Declare the input_string variable as local and assign the first argument
+  # passed to the function to input_string
+  local input_string
+  input_string="$1"
+
+  # Trim whitespace characters from both ends of the input string
+  input_string="${input_string#"${input_string%%[![:space:]]*}"}"
+  input_string="${input_string%"${input_string##*[![:space:]]}"}"
+
+  # Convert to lowercase and replace special characters with their normal
+  # alphabet character
+  local lowercase_string
+  lowercase_string=$(echo $input_string | tr '[:upper:]' '[:lower:]')
+  local replaced_string
+  replaced_string=$(echo $lowercase_string | iconv -f utf8 -t ascii//TRANSLIT)
+
+  # Replace all non-alphanumeric characters and all types of whitespace
+  # characters with underscores
+  input_string=${replaced_string//[^a-z0-9]/_}
+  input_string=${input_string//[[:space:]]/_}
+
+  # Return the modified string
+  echo "$input_string"
+}
+
+# Reads all ssh public keys from the user's ~/.ssh directory and returns all
+# the names that are found at the end of each public key
+# Usage: get_ssh_key_names return_variable
+get_ssh_key_names() {
+  # # Declare a variable to store the name of the variable that the return value
+  # # should be assigned to
+  # local return_value=$1
+  # Declare an array to store the names of the ssh keys
+  local ssh_key_names=()
+  
+  # Get the path to the user's ssh directory
+  local ssh_dir=~/.ssh
+
+  # Check if the ssh directory exists
+  if [ ! -d "$ssh_dir" ]; then
+    echo "Error: ssh directory not found"
+    return 1
+  fi
+
+  # Loop through all files in the ssh directory
+  for file in "$ssh_dir"/*.pub; do
+    # Check if the private key file exists
+    if [ ! -f "${file%.pub}" ]; then
+      continue
+    fi
+
+    # Get the name of the ssh key using the ssh-keygen command
+    local ssh_output
+    ssh_output="$(ssh-keygen -lf $file 2>/dev/null)"
+
+    # Check the exit code of the ssh-keygen command
+    if [ $? -eq 0 ]; then
+      # Get the ssh key name and append it to a new line
+      local ssh_key_name
+      ssh_key_name=$(echo "$ssh_output" | awk '{ for (i = 3; i <= NF; i++) {printf $i " "}; printf "\n"}')
+      ssh_key_name=$(echo "$ssh_key_name" | sed 's/([^)]*)//g' | xargs)
+      if [[ $ssh_key_name == "no comment" ]]; then
+        ssh_key_name="${file%.*}"
+        ssh_key_name="${ssh_key_name##*/}"
+      fi
+
+      printf "$ssh_key_name\n"
+    fi
+  done
+}
+
+
+###############################################################################
 # multiselect function is a modified version of the one originally created 
 # by Paul Miu (username: mamiu) and sourced from 
 # https://github.com/mamiu/dotfiles/blob/main/install/utils/multiselect.sh.
@@ -75,12 +159,12 @@ function multiselect {
   trap "cursor_blink_on; stty echo; printf '\n'; exit" 2
   cursor_blink_off
 
-#######################################
-# Function to handle key input and return corresponding action (up, down, enter, or space)
-# Arguments:
-#   None
-#######################################
-key_input() {
+  #######################################
+  # Function to handle key input and return corresponding action (up, down, enter, or space)
+  # Arguments:
+  #   None
+  #######################################
+  key_input() {
     local key
     IFS= read -rsn1 key 2>/dev/null >&2
     if [[ $key = ""    ]]; then echo enter; fi;
@@ -95,11 +179,11 @@ key_input() {
   }
 
 
-#######################################
-# Function to toggle the selection of an option and update the selected count
-# Arguments:
-#   option: the index of the option to toggle
-#######################################
+  #######################################
+  # Function to toggle the selection of an option and update the selected count
+  # Arguments:
+  #   option: the index of the option to toggle
+  #######################################
   toggle_option() {
     local option=$1
     if [[ ${selected[option]} == true ]]; then
@@ -111,12 +195,13 @@ key_input() {
     fi
   }
 
-#######################################
-# Function to print the options with selected ones marked and highlighted. 
-# The function takes one argument as input, which is an integer indicating the index of the option to be highlighted
-# Arguments:
-#   option_index: the index of the option to be highlighted
-#######################################
+  #######################################
+  # Function to print the options with selected ones marked and highlighted. 
+  # The function takes one argument as input, which is an integer indicating
+  # the index of the option to be highlighted
+  # Arguments:
+  #   option_index: the index of the option to be highlighted
+  #######################################
   print_options() {
     # print options by overwriting the last lines
     local idx=0
@@ -143,13 +228,14 @@ key_input() {
   }
 
 #######################################
-# Function to confirm if the number of selected options is less than 4, print the options and exit the loop
+# Function to confirm if the number of selected options is less than 4, print
+# the options and exit the loop
 # Arguments:
 #   None
 #######################################
   confirm_options() {
-    if [ $selected_count -lt 4 ]; then
-    print_options -1; break
+    if [ $selected_count -le 5 ]; then
+      print_options -1; break
     fi
   }
 
@@ -174,10 +260,10 @@ key_input() {
   printf "\n"
   cursor_blink_on
 
-  echo "return_value is of type: $(declare -p return_value | cut -d ' ' -f 2)"
-  echo "return_value contains: ${return_value[@]}"
-  echo "selected is of type: $(declare -p selected | cut -d ' ' -f 2)"
-  echo "selected contains: ${selected[@]}"
+  # echo "return_value is of type: $(declare -p return_value | cut -d ' ' -f 2)"
+  # echo "return_value contains: ${return_value[@]}"
+  # echo "selected is of type: $(declare -p selected | cut -d ' ' -f 2)"
+  # echo "selected contains: ${selected[@]}"
 
   eval $return_value='("${selected[@]}")'
 }
@@ -210,6 +296,7 @@ IFS=$'\n' read -rd '' -a key_array <<<"$keys"
 key_names=()
 for i in "${!key_array[@]}"; do
   key_name=$(echo ${key_array[i]}| awk '{$1=$2=""; print $0}')
+  key_name=$(convert_string "$key_name")
   key_names+=("$key_name")
 done
 
@@ -220,7 +307,7 @@ for key in "${key_array[@]}"; do
   pre_selection+=("false")
 done
 
-printf "Please select the ssh keys to be used:"
+printf "\033[1mPlease select the ssh keys to be used:\033[0m\n"
 
 multiselect "false" result key_names[@] pre_selection[@]
 
@@ -232,4 +319,16 @@ for key in "${key_array[@]}"; do
     echo "ssh-copy-id $force$dry_run$sftp$identity_file$port$ssh_option$1"
   fi
   ((idx++))
+done
+
+# Get the array of ssh key names
+ssh_key_names=()
+
+ssh_key_names_string=$(get_ssh_key_names)
+IFS=$'\n' read -rd '' -a ssh_key_names <<<"$ssh_key_names_string"
+
+# Print out a list of ssh key names
+printf "List of ssh key names:\n"
+for name in "${ssh_key_names[@]}"; do
+  printf " - %s\n" "$name"
 done
